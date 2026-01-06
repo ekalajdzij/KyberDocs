@@ -1,0 +1,63 @@
+backend-server/HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+backend-server/src/main/resources/application-secrets.properties
+
+### VS Code ###
+.vscode/
+
+#################################
+# INTELLIJ IDEA
+#################################
+.idea/
+
+#################################
+# PYTHON / FASTAPI
+#################################
+backend-python/.venv/
+backend-python/venv/
+backend-python/__pycache__/
+backend-python/*.pyc
+backend-python/*.pyo
+backend-python/.pytest_cache/
+
+#################################
+# ENV / SECRETS
+#################################
+.env
+.env.*
+
+#################################
+# OS
+#################################
+.DS_Store
+Thumbs.db
