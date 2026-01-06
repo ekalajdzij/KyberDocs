@@ -3,8 +3,8 @@
 
 **KyberDocs** is a next-generation **Document Management System (DMS)** designed to remain secure in the era of **quantum computing**. The system is built around a **hybrid cryptographic architecture** that combines:
 
-- **AES-256** for high-performance file encryption  
 - **CRYSTALS-Kyber-512**, a **NIST-standardized Post-Quantum Key Encapsulation Mechanism (KEM)**, for secure key exchange  
+- **AES-256** for high-performance file encryption  
 
 Unlike traditional DMS solutions that rely on **policy-based access control (ACLs)**, KyberDocs enforces **cryptographic access control**. Documents can only be decrypted by users who possess the **mathematically valid private keys**.  
 Even **database administrators or system operators cannot access document contents** without the required cryptographic material.
