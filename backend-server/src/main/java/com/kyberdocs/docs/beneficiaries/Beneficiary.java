@@ -1,5 +1,6 @@
 package com.kyberdocs.docs.beneficiaries;
 
+import com.kyberdocs.docs.converters.HexConverter;
 import com.kyberdocs.docs.documents.Document;
 import com.kyberdocs.docs.users.User;
 import jakarta.persistence.*;
@@ -24,11 +25,13 @@ public class Beneficiary {
     @JoinColumn(name = "document_id", nullable = false)
     private Document document;
 
+    @Convert(converter = HexConverter.class)
     @Column(name = "kyber_capsule", nullable = false, columnDefinition = "TEXT")
-    private String kyberCapsule;
+    private byte[] kyberCapsule;
 
+    @Convert(converter = HexConverter.class)
     @Column(name = "encrypted_key", nullable = false, columnDefinition = "TEXT")
-    private String encryptedKey;
+    private byte[] encryptedKey; // The wrapped file key
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -38,8 +41,8 @@ public class Beneficiary {
     public void setLinkedUser(User linkedUser) { this.linkedUser = linkedUser; }
     public Document getDocument() { return document; }
     public void setDocument(Document document) { this.document = document; }
-    public String getKyberCapsule() { return kyberCapsule; }
-    public void setKyberCapsule(String kyberCapsule) { this.kyberCapsule = kyberCapsule; }
-    public String getEncryptedKey() { return encryptedKey; }
-    public void setEncryptedKey(String encryptedKey) { this.encryptedKey = encryptedKey; }
+    public byte[] getKyberCapsule() { return kyberCapsule; }
+    public void setKyberCapsule(byte[] kyberCapsule) { this.kyberCapsule = kyberCapsule; }
+    public byte[] getEncryptedKey() { return encryptedKey; }
+    public void setEncryptedKey(byte[] encryptedKey) { this.encryptedKey = encryptedKey; }
 }

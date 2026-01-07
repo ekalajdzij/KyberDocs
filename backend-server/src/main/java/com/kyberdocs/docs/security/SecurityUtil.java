@@ -8,80 +8,80 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
-import java.util.Base64;
+import java.util.Arrays;
 
 @Component
 public class SecurityUtil {
 
     @Value("${app.master-key}")
-    private String masterKey;
+    private String masterKey; // Ideally this should also be injected as bytes/char[]
 
     private static final int GCM_IV_LENGTH = 12;
     private static final int GCM_TAG_LENGTH = 128;
-
     private static final String KEY_ALGORITHM = "AES";
     private static final String CIPHER_ALGORITHM = "AES/GCM/NoPadding";
 
-    public String encrypt(String value) {
+    /*
+     * Encrypts the Private Key (wrapping).
+     * Returns raw bytes (IV + Ciphertext).
+     * Clears input 'value' from memory.
+     */
+    public byte[] encrypt(byte[] value) {
         try {
-            // Generate a random IV
             byte[] iv = new byte[GCM_IV_LENGTH];
             new SecureRandom().nextBytes(iv);
 
-            // Setup Cipher
             SecretKeySpec keySpec = new SecretKeySpec(masterKey.getBytes(), KEY_ALGORITHM);
             Cipher cipher = Cipher.getInstance(CIPHER_ALGORITHM);
             GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
             cipher.init(Cipher.ENCRYPT_MODE, keySpec, gcmParameterSpec);
 
-            // Encrypt
-            byte[] cipherText = cipher.doFinal(value.getBytes());
+            byte[] cipherText = cipher.doFinal(value);
 
-            // Combine IV + Ciphertext (so we can save just one string in DB)
             ByteBuffer byteBuffer = ByteBuffer.allocate(iv.length + cipherText.length);
             byteBuffer.put(iv);
             byteBuffer.put(cipherText);
 
-            // Return as Base64
-            return Base64.getEncoder().encodeToString(byteBuffer.array());
+            return byteBuffer.array();
         } catch (Exception e) {
             throw new RuntimeException("Error encrypting private key", e);
+        } finally {
+            // ZEROING: Wipe the input sensitive data
+            if (value != null) Arrays.fill(value, (byte) 0);
         }
     }
 
-    public String decrypt(String encryptedValueBase64) {
+    /*
+     * Decrypts the Private Key (unwrapping).
+     * Returns raw bytes (Plaintext Private Key).
+     */
+    public byte[] decrypt(byte[] encryptedDataWithIv) {
         try {
-            // Decode Base64
-            byte[] decodedBytes = Base64.getDecoder().decode(encryptedValueBase64);
-
-            // Extract IV
-            ByteBuffer byteBuffer = ByteBuffer.wrap(decodedBytes);
+            ByteBuffer byteBuffer = ByteBuffer.wrap(encryptedDataWithIv);
             byte[] iv = new byte[GCM_IV_LENGTH];
-            byteBuffer.get(iv); // Reads first 12 bytes
+            byteBuffer.get(iv);
 
-            // Extract Ciphertext
             byte[] cipherText = new byte[byteBuffer.remaining()];
-            byteBuffer.get(cipherText); // Reads the rest
+            byteBuffer.get(cipherText);
 
-            // Decrypt
             SecretKeySpec keySpec = new SecretKeySpec(masterKey.getBytes(), KEY_ALGORITHM);
             Cipher cipher = Cipher.getInstance(CIPHER_ALGORITHM);
             GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
             cipher.init(Cipher.DECRYPT_MODE, keySpec, gcmParameterSpec);
 
-            return new String(cipher.doFinal(cipherText));
+            return cipher.doFinal(cipherText);
         } catch (Exception e) {
             throw new RuntimeException("Error decrypting private key", e);
         }
     }
 
     /*
-        File encryption - AES
+     * File Encryption.
+     * Clears 'sharedSecret' from memory.
      */
-    public byte[] encryptFile(byte[] fileData, String sharedSecretHex) {
+    public byte[] encryptFile(byte[] fileData, byte[] sharedSecret) {
         try {
-            byte[] keyBytes = hexStringToByteArray(sharedSecretHex);
-            SecretKeySpec keySpec = new SecretKeySpec(keyBytes, KEY_ALGORITHM);
+            SecretKeySpec keySpec = new SecretKeySpec(sharedSecret, KEY_ALGORITHM);
 
             byte[] iv = new byte[GCM_IV_LENGTH];
             new SecureRandom().nextBytes(iv);
@@ -98,14 +98,20 @@ public class SecurityUtil {
 
             return output;
         } catch (Exception e) {
-            throw new RuntimeException("Error encrypting file with Kyber secret", e);
+            throw new RuntimeException("Error encrypting file", e);
+        } finally {
+            // ZEROING: Wipe shared secret
+            if (sharedSecret != null) Arrays.fill(sharedSecret, (byte) 0);
         }
     }
 
-    public byte[] decryptFile(byte[] encryptedDataWithIv, String sharedSecretHex) {
+    /*
+     * File Decryption.
+     * Clears 'sharedSecret' from memory.
+     */
+    public byte[] decryptFile(byte[] encryptedDataWithIv, byte[] sharedSecret) {
         try {
-            byte[] keyBytes = hexStringToByteArray(sharedSecretHex);
-            SecretKeySpec keySpec = new SecretKeySpec(keyBytes, KEY_ALGORITHM);
+            SecretKeySpec keySpec = new SecretKeySpec(sharedSecret, KEY_ALGORITHM);
 
             byte[] iv = new byte[GCM_IV_LENGTH];
             System.arraycopy(encryptedDataWithIv, 0, iv, 0, iv.length);
@@ -121,16 +127,9 @@ public class SecurityUtil {
             return cipher.doFinal(cipherText);
         } catch (Exception e) {
             throw new RuntimeException("Error decrypting file", e);
+        } finally {
+            // ZEROING: Wipe shared secret
+            if (sharedSecret != null) Arrays.fill(sharedSecret, (byte) 0);
         }
-    }
-
-    private byte[] hexStringToByteArray(String s) {
-        int len = s.length();
-        byte[] data = new byte[len / 2];
-        for (int i = 0; i < len; i += 2) {
-            data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4)
-                    + Character.digit(s.charAt(i + 1), 16));
-        }
-        return data;
     }
 }

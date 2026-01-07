@@ -1,5 +1,6 @@
 package com.kyberdocs.docs.users;
 
+import com.kyberdocs.docs.converters.HexConverter; // Dodaj import za konverter
 import com.kyberdocs.docs.exceptions.UserNotFoundException;
 import com.kyberdocs.docs.users.dto.SignUpRequestDto;
 import com.kyberdocs.docs.users.dto.UserResponseDto;
@@ -57,7 +58,11 @@ public class UserController {
         dto.setRole(user.getRole());
         dto.setStatus(user.getStatus());
         dto.setInactivityTimeout(user.getInactivityTimeout());
-        dto.setKyberPublicKeyHex(user.getKyberPublicKeyHex());
+
+        if (user.getKyberPublicKey() != null) {
+            dto.setKyberPublicKeyHex(HexConverter.bytesToHex(user.getKyberPublicKey()));
+        }
+
         return dto;
     }
 }

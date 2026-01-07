@@ -1,6 +1,7 @@
 package com.kyberdocs.docs.users;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.kyberdocs.docs.converters.HexConverter;
 import jakarta.persistence.*;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -41,14 +42,13 @@ public class User implements UserDetails {
     @Column
     private UserStatus status;
 
-    @JsonIgnore
+    @Convert(converter = HexConverter.class)
     @Column(name = "kyber_public_key_hex", columnDefinition = "TEXT")
-    private String kyberPublicKeyHex;
+    private byte[] kyberPublicKey;
 
-    @JsonIgnore
+    @Convert(converter = HexConverter.class)
     @Column(name = "kyber_secret_key_hex", columnDefinition = "TEXT")
-    private String kyberSecretKeyHex;
-
+    private byte[] kyberSecretKey; // This holds the WRAPPED (AES Encrypted) key
     public Long getId() {
         return id;
     }
@@ -113,21 +113,11 @@ public class User implements UserDetails {
         this.status = status;
     }
 
-    public String getKyberPublicKeyHex() {
-        return kyberPublicKeyHex;
-    }
+    public byte[] getKyberPublicKey() { return kyberPublicKey; }
+    public void setKyberPublicKey(byte[] kyberPublicKey) { this.kyberPublicKey = kyberPublicKey; }
 
-    public void setKyberPublicKeyHex(String kyberPublicKeyHex) {
-        this.kyberPublicKeyHex = kyberPublicKeyHex;
-    }
-
-    public String getKyberSecretKeyHex() {
-        return kyberSecretKeyHex;
-    }
-
-    public void setKyberSecretKeyHex(String kyberSecretKeyHex) {
-        this.kyberSecretKeyHex = kyberSecretKeyHex;
-    }
+    public byte[] getKyberSecretKey() { return kyberSecretKey; }
+    public void setKyberSecretKey(byte[] kyberSecretKey) { this.kyberSecretKey = kyberSecretKey; }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

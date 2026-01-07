@@ -1,11 +1,15 @@
 package com.kyberdocs.docs.users;
 
 import com.kyberdocs.docs.auth.AuthService;
+import com.kyberdocs.docs.converters.HexConverter; // Import konvertera
 import com.kyberdocs.docs.users.dto.SignUpRequestDto;
+import com.kyberdocs.docs.users.dto.UserResponseDto;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/admin/users")
@@ -21,19 +25,17 @@ public class AdminController {
     }
 
     @GetMapping
-    public ResponseEntity<List<User>> getAllUsers() {
-        List<User> users = userService.findAll();
-        users.forEach(u -> {
-            u.setKyberSecretKeyHex("REDACTED");
-        });
+    public ResponseEntity<List<UserResponseDto>> getAllUsers() {
+        List<UserResponseDto> users = userService.findAll().stream()
+                .map(this::toResponseDto) // Mapiramo svaki entitet u DTO
+                .collect(Collectors.toList());
         return ResponseEntity.ok(users);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<User> getUserById(@PathVariable Long id) {
+    public ResponseEntity<UserResponseDto> getUserById(@PathVariable Long id) {
         User user = userService.getUserById(id);
-        user.setKyberSecretKeyHex("REDACTED");
-        return ResponseEntity.ok(user);
+        return ResponseEntity.ok(toResponseDto(user));
     }
 
     @PostMapping
@@ -47,16 +49,31 @@ public class AdminController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<User> updateUser(@PathVariable Long id,
-                                           @RequestBody SignUpRequestDto dto) {
+    public ResponseEntity<UserResponseDto> updateUser(@PathVariable Long id,
+                                                      @RequestBody SignUpRequestDto dto) {
         User updated = userService.updateUserById(id, dto);
-        updated.setKyberSecretKeyHex("REDACTED");
-        return ResponseEntity.ok(updated);
+        return ResponseEntity.ok(toResponseDto(updated));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteUser(@PathVariable Long id) {
         userService.deleteUser(id);
         return ResponseEntity.ok("User deleted.");
+    }
+
+    private UserResponseDto toResponseDto(User user) {
+        UserResponseDto dto = new UserResponseDto();
+        dto.setId(user.getId());
+        dto.setUsername(user.getUsername());
+        dto.setEmail(user.getEmail());
+        dto.setRole(user.getRole());
+        dto.setStatus(user.getStatus());
+        dto.setInactivityTimeout(user.getInactivityTimeout());
+
+        if (user.getKyberPublicKey() != null) {
+            dto.setKyberPublicKeyHex(HexConverter.bytesToHex(user.getKyberPublicKey()));
+        }
+
+        return dto;
     }
 }

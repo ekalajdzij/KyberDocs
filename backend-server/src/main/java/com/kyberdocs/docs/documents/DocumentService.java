@@ -3,6 +3,7 @@ package com.kyberdocs.docs.documents;
 import com.kyberdocs.docs.audit.AuditService;
 import com.kyberdocs.docs.beneficiaries.Beneficiary;
 import com.kyberdocs.docs.beneficiaries.BeneficiaryRepository;
+import com.kyberdocs.docs.converters.HexConverter;
 import com.kyberdocs.docs.documents.dto.DocumentSummaryDto;
 import com.kyberdocs.docs.kyber.dto.KyberDecapsulateResponse;
 import com.kyberdocs.docs.kyber.dto.KyberEncapsulateResponse;
@@ -111,7 +112,7 @@ public class DocumentService {
     public Document uploadDocument(User user, MultipartFile file) throws IOException {
         String requestUrl = pythonServerUrl + "api/kyber/encapsulate";
         Map<String, String> requestBody = new HashMap<>();
-        requestBody.put("publicKeyHex", user.getKyberPublicKeyHex());
+        requestBody.put("publicKeyHex", HexConverter.bytesToHex(user.getKyberPublicKey()));
         requestBody.put("parameterSet", "kyber512");
 
         KyberEncapsulateResponse kyberResponse = restTemplate.postForObject(
@@ -123,12 +124,12 @@ public class DocumentService {
         byte[] fileBytes = file.getBytes();
 
         // Encrypt the file (IV is prepended to the output automatically by SecurityUtil)
-        byte[] encryptedFileBytes = securityUtil.encryptFile(fileBytes, kyberResponse.getSharedSecretHashHex());
+        byte[] sharedSecret = HexConverter.hexToBytes(kyberResponse.getSharedSecretHashHex());
+        byte[] encryptedFileBytes = securityUtil.encryptFile(fileBytes, sharedSecret);
 
         // Assuming Standard AES-GCM (12 bytes) or AES-CBC (16 bytes).
         // We take the first 12 bytes which is the standard IV length for GCM.
         byte[] ivBytes = Arrays.copyOfRange(encryptedFileBytes, 0, 12);
-        String realIvHex = bytesToHex(ivBytes);
 
         Document doc = new Document();
         doc.setOwner(user);
@@ -140,9 +141,9 @@ public class DocumentService {
 
         DocumentKeys keys = new DocumentKeys();
         keys.setDocument(doc);
-        keys.setKyberCapsule(kyberResponse.getCiphertextHex());
+        keys.setKyberCapsule(HexConverter.hexToBytes(kyberResponse.getCiphertextHex()));
         keys.setAlgoIdentifier("kyber512");
-        keys.setAesIv(realIvHex);
+        keys.setAesIv(HexConverter.bytesToHex(ivBytes));
         documentKeysRepository.save(keys);
 
         auditService.logEvent(user, "UPLOAD", "Uploaded encrypted file: " + doc.getFilename());
@@ -155,7 +156,7 @@ public class DocumentService {
         Document doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new RuntimeException("Document not found"));
 
-        String finalFileKey = null;
+        byte[] finalFileKey = null;
 
         // PATH 1: User is the OWNER
         if (doc.getOwner().getId().equals(user.getId())) {
@@ -171,14 +172,10 @@ public class DocumentService {
             if (benOpt.isPresent()) {
                 Beneficiary ben = benOpt.get();
                 // A. Decrypt the "Wrapper" using Beneficiary's Private Key
-                String wrapperKey = getSharedSecretFromKyber(user, ben.getKyberCapsule());
+                byte[] wrapperKey = getSharedSecretFromKyber(user, ben.getKyberCapsule());
 
                 // B. Unwrap the "Master Key" using the Wrapper Key (AES Decrypt)
-                byte[] encryptedKeyBytes = hexToBytes(ben.getEncryptedKey());
-
-                // Note: SecurityUtil.decryptFile handles IV extraction internally from encryptedKeyBytes
-                byte[] masterKeyBytes = securityUtil.decryptFile(encryptedKeyBytes, wrapperKey);
-                finalFileKey = new String(masterKeyBytes, StandardCharsets.UTF_8);
+                finalFileKey = securityUtil.decryptFile(ben.getEncryptedKey(), wrapperKey);
             } else if (user.getRole().name().contains("ADMIN")) {
                 throw new RuntimeException("Admins cannot decrypt user files without explicit sharing");
             } else {
@@ -196,20 +193,27 @@ public class DocumentService {
         return decryptedBytes;
     }
 
-    private String getSharedSecretFromKyber(User user, String capsule) {
-        String userPrivateKeyPlain = securityUtil.decrypt(user.getKyberSecretKeyHex());
-        String requestUrl = pythonServerUrl + "api/kyber/decapsulate";
-        Map<String, String> requestBody = new HashMap<>();
-        requestBody.put("ciphertextHex", capsule);
-        requestBody.put("secretKeyHex", userPrivateKeyPlain);
-        requestBody.put("parameterSet", "kyber512");
+    private byte[] getSharedSecretFromKyber(User user, byte[] capsuleBytes) {
+        // 1. Unwrap Private Key (Returns bytes)
+        byte[] userPrivateKeyPlain = securityUtil.decrypt(user.getKyberSecretKey());
 
-        KyberDecapsulateResponse kyberResponse = restTemplate.postForObject(
-                requestUrl, requestBody, KyberDecapsulateResponse.class
-        );
+        try {
+            String requestUrl = pythonServerUrl + "api/kyber/decapsulate";
+            Map<String, String> requestBody = new HashMap<>();
 
-        if (kyberResponse == null) throw new RuntimeException("Kyber Decapsulation failed");
-        return kyberResponse.getSharedSecretHashHex();
+            // Send Hex to Python
+            requestBody.put("ciphertextHex", HexConverter.bytesToHex(capsuleBytes));
+            requestBody.put("secretKeyHex", HexConverter.bytesToHex(userPrivateKeyPlain));
+            requestBody.put("parameterSet", "kyber512");
+
+            KyberDecapsulateResponse kyberResponse = restTemplate.postForObject(requestUrl, requestBody, KyberDecapsulateResponse.class);
+            if (kyberResponse == null) throw new RuntimeException("Decapsulation failed");
+
+            return HexConverter.hexToBytes(kyberResponse.getSharedSecretHashHex());
+        } finally {
+            // ZEROING: Clear plain private key from memory
+            Arrays.fill(userPrivateKeyPlain, (byte) 0);
+        }
     }
 
     // Helper to convert hex string to byte array

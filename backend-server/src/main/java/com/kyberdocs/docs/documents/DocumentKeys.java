@@ -1,5 +1,6 @@
 package com.kyberdocs.docs.documents;
 
+import com.kyberdocs.docs.converters.HexConverter;
 import jakarta.persistence.*;
 
 @Entity
@@ -22,8 +23,9 @@ public class DocumentKeys {
     )
     private Document document;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String kyberCapsule;
+    @Convert(converter = HexConverter.class)
+    @Column(name = "kyber_capsule", nullable = false, columnDefinition = "TEXT")
+    private byte[] kyberCapsule;
 
     @Column(nullable = false, length = 100)
     private String aesIv;
@@ -43,13 +45,9 @@ public class DocumentKeys {
         this.document = document;
     }
 
-    public String getKyberCapsule() {
-        return kyberCapsule;
-    }
+    public byte[] getKyberCapsule() { return kyberCapsule; }
 
-    public void setKyberCapsule(String kyberCapsule) {
-        this.kyberCapsule = kyberCapsule;
-    }
+    public void setKyberCapsule(byte[] kyberCapsule) { this.kyberCapsule = kyberCapsule; }
 
     public String getAesIv() {
         return aesIv;

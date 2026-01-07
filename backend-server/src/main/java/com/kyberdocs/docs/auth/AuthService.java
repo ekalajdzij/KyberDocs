@@ -1,5 +1,6 @@
 package com.kyberdocs.docs.auth;
 
+import com.kyberdocs.docs.converters.HexConverter;
 import com.kyberdocs.docs.exceptions.InvalidCredentialsException;
 import com.kyberdocs.docs.exceptions.UserAlreadyExistsException;
 import com.kyberdocs.docs.kyber.dto.KyberKeygenResponse;
@@ -72,7 +73,10 @@ public class AuthService {
             throw new RuntimeException("Failed to generate Kyber keys from Python server.");
         }
 
-        String encryptedPrivateKey = securityUtil.encrypt(generatedKeys.getSecretKeyHex());
+        byte[] secretKeyBytes = HexConverter.hexToBytes(generatedKeys.getSecretKeyHex());
+        byte[] publicKeyBytes = HexConverter.hexToBytes(generatedKeys.getPublicKeyHex());
+
+        byte[] encryptedSecretKey = securityUtil.encrypt(secretKeyBytes);
 
         User user = new User();
         user.setUsername(request.getUsername());
@@ -84,8 +88,8 @@ public class AuthService {
         user.setInactivityTimeout(15 * 60);
         user.setStatus(UserStatus.STATUS_ACTIVE);
 
-        user.setKyberPublicKeyHex(generatedKeys.getPublicKeyHex());
-        user.setKyberSecretKeyHex(encryptedPrivateKey);
+        user.setKyberPublicKey(publicKeyBytes);
+        user.setKyberSecretKey(encryptedSecretKey);
 
         userService.save(user);
 
@@ -126,8 +130,8 @@ public class AuthService {
         user.setInactivityTimeout(30 * 60);
 
         // Admins don't strictly need Kyber keys
-        user.setKyberPublicKeyHex(null);
-        user.setKyberSecretKeyHex(null);
+        user.setKyberPublicKey(null);
+        user.setKyberSecretKey(null);
 
         userRepository.save(user);
 
