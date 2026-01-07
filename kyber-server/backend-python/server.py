@@ -20,9 +20,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# You should change this path accordingly
 KYBER_BACKEND_PATH = "/home/emir/kyber-python-server/kyber_backend"
 
-# mapiranje param setova na veličine u bajtovima [web:70][web:68]
 KYBER_PARAM_SIZES = {
     "kyber512":  {"pk": 800,  "ct": 768,  "sk": 1632},
     "kyber768":  {"pk": 1184, "ct": 1088, "sk": 2400},
@@ -123,8 +123,6 @@ def decapsulate(req: DecapsulateRequest):
     ct_hex = req.ciphertextHex.strip()
     sk_hex = req.secretKeyHex.strip()
 
-    # Dužinske provjere možeš ostaviti mekane ili ih skroz izbaciti,
-    # backend će ih svakako validirati.
     sizes = KYBER_PARAM_SIZES[req.parameterSet]
     expected_ct_hex_len = 2 * sizes["ct"]
     expected_sk_hex_len = 2 * sizes["sk"]
