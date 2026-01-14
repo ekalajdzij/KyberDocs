@@ -35,14 +35,25 @@ public class BeneficiaryController {
         return ResponseEntity.ok(beneficiaryService.getAllSystemBeneficiaries());
     }
 
-    @PostMapping
-    public ResponseEntity<BeneficiaryDto> addBeneficiary(@AuthenticationPrincipal UserDetails userDetails,
+    @PostMapping("/share")
+    public ResponseEntity<BeneficiaryDto> shareDocument(@AuthenticationPrincipal UserDetails userDetails,
                                                          @RequestBody AddBeneficiaryRequestDto request) {
         User user = userService.findByUsername(userDetails.getUsername())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         return ResponseEntity.ok(
-                beneficiaryService.addBeneficiary(user, request.getDocumentId(), request.getTargetUsername())
+                beneficiaryService.shareImmediately(user, request.getDocumentId(), request.getTargetUsername())
+        );
+    }
+
+    @PostMapping("/legacy")
+    public ResponseEntity<BeneficiaryDto> addLegacyBeneficiary(@AuthenticationPrincipal UserDetails userDetails,
+                                                        @RequestBody AddBeneficiaryRequestDto request) {
+        User user = userService.findByUsername(userDetails.getUsername())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return ResponseEntity.ok(
+                beneficiaryService.addDeadManSwitchBeneficiary(user, request.getDocumentId(), request.getTargetUsername())
         );
     }
 

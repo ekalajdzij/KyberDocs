@@ -16,17 +16,14 @@ public class BeneficiaryDto {
     public BeneficiaryDto(Beneficiary beneficiary) {
         this.id = beneficiary.getId();
 
-        // 1. Map Owner
         if (beneficiary.getOwner() != null) {
             this.ownerUsername = beneficiary.getOwner().getUsername();
         }
 
-        // 2. Map Beneficiary (The 'Linked User')
         if (beneficiary.getLinkedUser() != null) {
             this.beneficiaryUsername = beneficiary.getLinkedUser().getUsername();
         }
 
-        // 3. Map Document Details
         if (beneficiary.getDocument() != null) {
             this.documentId = beneficiary.getDocument().getId();
             this.documentName = beneficiary.getDocument().getFilename(); // or getTitle()

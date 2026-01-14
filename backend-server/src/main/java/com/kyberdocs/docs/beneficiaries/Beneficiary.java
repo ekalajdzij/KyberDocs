@@ -33,6 +33,11 @@ public class Beneficiary {
     @Column(name = "encrypted_key", nullable = false, columnDefinition = "TEXT")
     private byte[] encryptedKey; // The wrapped file key
 
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "access_condition", nullable = false)
+    private AccessCondition accessCondition;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public User getOwner() { return owner; }
@@ -45,4 +50,7 @@ public class Beneficiary {
     public void setKyberCapsule(byte[] kyberCapsule) { this.kyberCapsule = kyberCapsule; }
     public byte[] getEncryptedKey() { return encryptedKey; }
     public void setEncryptedKey(byte[] encryptedKey) { this.encryptedKey = encryptedKey; }
+
+    public AccessCondition getAccessCondition() { return accessCondition; }
+    public void setAccessCondition(AccessCondition accessCondition) { this.accessCondition = accessCondition; }
 }

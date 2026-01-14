@@ -55,6 +55,10 @@ public class UserService {
     @Transactional
     public void updateHeartbeat(User user) {
         user.setLastHeartbeat(new Timestamp(System.currentTimeMillis()));
+
+        if (user.getStatus() == UserStatus.STATUS_WARNING) {
+            user.setStatus(UserStatus.STATUS_ACTIVE);
+        }
         userRepository.save(user);
     }
 

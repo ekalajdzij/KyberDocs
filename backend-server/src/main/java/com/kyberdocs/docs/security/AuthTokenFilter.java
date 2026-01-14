@@ -20,9 +20,10 @@ public class AuthTokenFilter extends OncePerRequestFilter {
 
     @Autowired
     private JwtUtil jwtUtils;
-
     @Autowired
     private CustomUserDetailsService userDetailsService;
+    @Autowired
+    private RedisService redisService;
 
     @Override
     protected void doFilterInternal(
@@ -32,15 +33,15 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         try {
             String jwt = parseJwt(request);
+            if (jwt != null && redisService.isBlacklisted(jwt)) {
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token is logged out (Blacklisted in Redis)");
+                return;
+            }
 
             if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
-                //System.out.println("jwt token validated\n");
-
                 String username = jwtUtils.getUsernameFromToken(jwt);
-                //System.out.println("username extracted: " + username + "\n");
 
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-                //System.out.println("user details: " + userDetails);
 
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
@@ -48,7 +49,7 @@ public class AuthTokenFilter extends OncePerRequestFilter {
                                 null,
                                 userDetails.getAuthorities()
                         );
-                System.out.println("authentication token:" + authentication);
+
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);

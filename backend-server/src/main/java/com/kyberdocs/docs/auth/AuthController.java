@@ -1,14 +1,12 @@
 package com.kyberdocs.docs.auth;
 
+import com.kyberdocs.docs.auth.dto.RefreshTokenRequestDto;
 import com.kyberdocs.docs.users.dto.SignInRequestDto;
 import com.kyberdocs.docs.users.dto.SignUpRequestDto;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -20,9 +18,7 @@ public class AuthController {
 
     private final AuthService authService;
 
-    public AuthController(
-            AuthService authService
-    ) {
+    public AuthController(AuthService authService) {
         this.authService = authService;
     }
 
@@ -31,38 +27,37 @@ public class AuthController {
         String token = authService.signUp(request);
 
         Map<String, String> response = new HashMap<>();
-        response.put("token", token);
+        response.put("accessToken", token); // Renamed to accessToken for consistency
 
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
     @PostMapping("/signIn")
     public ResponseEntity<Map<String, String>> signIn(@Valid @RequestBody SignInRequestDto request) {
-        String token = authService.signIn(request);
-
-        Map<String, String> response = new HashMap<>();
-        response.put("token", token);
-
-        return ResponseEntity.ok(response);
+        // Service now returns a Map containing both accessToken and refreshToken
+        Map<String, String> tokens = authService.signIn(request);
+        return ResponseEntity.ok(tokens);
     }
 
     @PostMapping("/create-admin")
     public ResponseEntity<?> createAdmin(@Valid @RequestBody SignUpRequestDto signUpRequest){
-
         String token = authService.registerAdmin(signUpRequest);
 
         Map<String, String> response = new HashMap<>();
-        response.put("token", token);
+        response.put("accessToken", token);
 
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/refresh-token")
+    public ResponseEntity<Map<String, String>> refreshToken(@Valid @RequestBody RefreshTokenRequestDto request) {
+        return ResponseEntity.ok(authService.refreshToken(request.getRefreshToken()));
+    }
+
     @PostMapping("/logout")
-    public ResponseEntity<String> logoutUser(HttpServletRequest request, HttpServletResponse response) {
-        org.springframework.security.core.Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null) {
-            new SecurityContextLogoutHandler().logout(request, response, auth);
-        }
+    public ResponseEntity<String> logoutUser(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        authService.logout(authHeader);
         return ResponseEntity.ok("Log out successful");
     }
 }

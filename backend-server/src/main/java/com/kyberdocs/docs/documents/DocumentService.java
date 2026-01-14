@@ -1,6 +1,7 @@
 package com.kyberdocs.docs.documents;
 
 import com.kyberdocs.docs.audit.AuditService;
+import com.kyberdocs.docs.beneficiaries.AccessCondition;
 import com.kyberdocs.docs.beneficiaries.Beneficiary;
 import com.kyberdocs.docs.beneficiaries.BeneficiaryRepository;
 import com.kyberdocs.docs.converters.HexConverter;
@@ -9,6 +10,7 @@ import com.kyberdocs.docs.kyber.dto.KyberDecapsulateResponse;
 import com.kyberdocs.docs.kyber.dto.KyberEncapsulateResponse;
 import com.kyberdocs.docs.security.SecurityUtil;
 import com.kyberdocs.docs.users.User;
+import com.kyberdocs.docs.users.UserStatus;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,30 +59,14 @@ public class DocumentService {
                 .getFilename();
     }
 
+    @Transactional(readOnly = true)
     public List<DocumentSummaryDto> getAllDocuments(User user) {
-        return documentRepository.findByOwner(user).stream()
-                .map(doc -> new DocumentSummaryDto(
-                        doc.getId(),
-                        doc.getFilename(),
-                        doc.getFileSize(),
-                        doc.getMimeType(),
-                        doc.getCreatedAt(),
-                        doc.getOwner()
-                ))
-                .collect(Collectors.toList());
+        return documentRepository.findSummariesByOwner(user);
     }
 
+    @Transactional(readOnly = true)
     public List<DocumentSummaryDto> getAllSystemDocuments() {
-        return documentRepository.findAll().stream()
-                .map(doc -> new DocumentSummaryDto(
-                        doc.getId(),
-                        doc.getFilename(),
-                        doc.getFileSize(),
-                        doc.getMimeType(),
-                        doc.getCreatedAt(),
-                        doc.getOwner()
-                ))
-                .collect(Collectors.toList());
+        return documentRepository.findAllSummaries();
     }
 
     @Transactional
@@ -168,6 +154,14 @@ public class DocumentService {
 
             if (benOpt.isPresent()) {
                 Beneficiary ben = benOpt.get();
+
+                // Dead Man's Switch check
+                if(ben.getAccessCondition() == AccessCondition.ON_INACTIVITY) {
+                    if (doc.getOwner().getStatus() == UserStatus.STATUS_ACTIVE || doc.getOwner().getStatus() == UserStatus.STATUS_WARNING) {
+                        throw new RuntimeException("Access Denied: This document is time-locked by the Dead Man's Switch protocol.");
+                    }
+                }
+
                 // A. Decrypt the Wrapper using Beneficiary's Private Key
                 byte[] wrapperKey = getSharedSecretFromKyber(user, ben.getKyberCapsule());
 
@@ -208,23 +202,5 @@ public class DocumentService {
             // ZEROING: Clear plain private key from memory
             Arrays.fill(userPrivateKeyPlain, (byte) 0);
         }
-    }
-
-    private byte[] hexToBytes(String s) {
-        int len = s.length();
-        byte[] data = new byte[len / 2];
-        for (int i = 0; i < len; i += 2) {
-            data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4)
-                    + Character.digit(s.charAt(i+1), 16));
-        }
-        return data;
-    }
-
-    private String bytesToHex(byte[] bytes) {
-        StringBuilder sb = new StringBuilder();
-        for (byte b : bytes) {
-            sb.append(String.format("%02x", b));
-        }
-        return sb.toString();
     }
 }

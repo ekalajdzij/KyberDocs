@@ -56,7 +56,16 @@ public class BeneficiaryService {
     }
 
     @Transactional
-    public BeneficiaryDto addBeneficiary(User owner, Long documentId, String targetUsername) {
+    public BeneficiaryDto shareImmediately(User owner, Long documentId, String targetUsername) {
+        return createBeneficiaryInternal(owner, documentId, targetUsername, AccessCondition.IMMEDIATE);
+    }
+
+    @Transactional
+    public BeneficiaryDto addDeadManSwitchBeneficiary(User owner, Long documentId, String targetUsername) {
+        return createBeneficiaryInternal(owner, documentId, targetUsername, AccessCondition.ON_INACTIVITY);
+    }
+
+    private BeneficiaryDto createBeneficiaryInternal(User owner, Long documentId, String targetUsername, AccessCondition condition) {
         Document doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new RuntimeException("Document not found"));
 
@@ -68,7 +77,7 @@ public class BeneficiaryService {
                 .orElseThrow(() -> new RuntimeException("Target user not found"));
 
         if (beneficiaryRepository.existsByOwnerAndLinkedUserAndDocument(owner, targetUser, doc)) {
-            throw new RuntimeException("User is already a beneficiary");
+            throw new RuntimeException("User is already a beneficiary for this document");
         }
 
         DocumentKeys ownerKeys = documentKeysRepository.findByDocument(doc)
@@ -82,7 +91,7 @@ public class BeneficiaryService {
             // Decapsulate to get the original file Master Key
             masterFileKey = decapsulateKey(ownerKeys.getKyberCapsule(), ownerPrivateKey);
 
-            //  Call Encapsulate function for desired Beneficiary to get the Wrapper Key
+            // Call Encapsulate function for desired Beneficiary to get the Wrapper Key
             String targetPkHex = HexConverter.bytesToHex(targetUser.getKyberPublicKey());
             KyberEncapsulateResponse wrapper = encapsulateForKey(targetPkHex);
 
@@ -96,6 +105,7 @@ public class BeneficiaryService {
             beneficiary.setOwner(owner);
             beneficiary.setLinkedUser(targetUser);
             beneficiary.setDocument(doc);
+            beneficiary.setAccessCondition(condition); // <--- Storing the condition here
 
             beneficiary.setKyberCapsule(HexConverter.hexToBytes(wrapper.getCiphertextHex()));
             beneficiary.setEncryptedKey(encryptedMasterKeyBytes);

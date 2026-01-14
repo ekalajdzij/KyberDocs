@@ -64,6 +64,13 @@ public class JwtUtil {
         return getClaimFromToken(token, claims -> claims.get("role", String.class));
     }
 
+    /*
+        Get Expiration Date from Token (Required for Blacklisting)
+     */
+    public Date extractExpiration(String token) {
+        return getClaimFromToken(token, Claims::getExpiration);
+    }
+
     public <T> T getClaimFromToken(String token, Function<Claims, T> claimsResolver) {
         final Claims claims = Jwts.parserBuilder()
                 .setSigningKey(key)

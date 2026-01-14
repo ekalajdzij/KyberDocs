@@ -30,6 +30,7 @@ public class Document {
     @Column(nullable = false)
     private Long fileSize;
 
+    @Basic(fetch = FetchType.LAZY)
     @Column(name = "encrypted_data", columnDefinition="bytea", nullable = false)
     private byte[] encryptedData;
 
