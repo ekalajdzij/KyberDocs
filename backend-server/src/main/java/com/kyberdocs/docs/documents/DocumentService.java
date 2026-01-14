@@ -95,11 +95,11 @@ public class DocumentService {
             throw new RuntimeException("Unauthorized: You do not own this document");
         }
 
-        // Delete associated keys (Owner's keys)
+        // Delete associated keys (owner's keys)
         documentKeysRepository.findByDocument(doc)
                 .ifPresent(documentKeysRepository::delete);
 
-        // Delete associated beneficiaries (Shared keys)
+        // Delete associated beneficiaries (shared keys)
         beneficiaryRepository.deleteByDocument(doc);
 
         // Delete the document itself
@@ -126,9 +126,6 @@ public class DocumentService {
         // Encrypt the file (IV is prepended to the output automatically by SecurityUtil)
         byte[] sharedSecret = HexConverter.hexToBytes(kyberResponse.getSharedSecretHashHex());
         byte[] encryptedFileBytes = securityUtil.encryptFile(fileBytes, sharedSecret);
-
-        // Assuming Standard AES-GCM (12 bytes) or AES-CBC (16 bytes).
-        // We take the first 12 bytes which is the standard IV length for GCM.
         byte[] ivBytes = Arrays.copyOfRange(encryptedFileBytes, 0, 12);
 
         Document doc = new Document();
@@ -158,23 +155,23 @@ public class DocumentService {
 
         byte[] finalFileKey = null;
 
-        // PATH 1: User is the OWNER
+        // User is the OWNER
         if (doc.getOwner().getId().equals(user.getId())) {
             DocumentKeys keys = documentKeysRepository.findByDocument(doc)
                     .orElseThrow(() -> new RuntimeException("Keys not found"));
 
             finalFileKey = getSharedSecretFromKyber(user, keys.getKyberCapsule());
         }
-        // PATH 2: User is a BENEFICIARY
+        // User is a BENEFICIARY
         else {
             Optional<Beneficiary> benOpt = beneficiaryRepository.findByDocumentAndLinkedUser(doc, user);
 
             if (benOpt.isPresent()) {
                 Beneficiary ben = benOpt.get();
-                // A. Decrypt the "Wrapper" using Beneficiary's Private Key
+                // A. Decrypt the Wrapper using Beneficiary's Private Key
                 byte[] wrapperKey = getSharedSecretFromKyber(user, ben.getKyberCapsule());
 
-                // B. Unwrap the "Master Key" using the Wrapper Key (AES Decrypt)
+                // B. Unwrap the Master Key using the Wrapper Key
                 finalFileKey = securityUtil.decryptFile(ben.getEncryptedKey(), wrapperKey);
             } else if (user.getRole().name().contains("ADMIN")) {
                 throw new RuntimeException("Admins cannot decrypt user files without explicit sharing");
@@ -183,7 +180,6 @@ public class DocumentService {
             }
         }
 
-        // Decrypt the actual file content
         byte[] decryptedBytes = securityUtil.decryptFile(
                 doc.getEncryptedData(),
                 finalFileKey
@@ -194,14 +190,12 @@ public class DocumentService {
     }
 
     private byte[] getSharedSecretFromKyber(User user, byte[] capsuleBytes) {
-        // 1. Unwrap Private Key (Returns bytes)
         byte[] userPrivateKeyPlain = securityUtil.decrypt(user.getKyberSecretKey());
 
         try {
             String requestUrl = pythonServerUrl + "api/kyber/decapsulate";
             Map<String, String> requestBody = new HashMap<>();
 
-            // Send Hex to Python
             requestBody.put("ciphertextHex", HexConverter.bytesToHex(capsuleBytes));
             requestBody.put("secretKeyHex", HexConverter.bytesToHex(userPrivateKeyPlain));
             requestBody.put("parameterSet", "kyber512");
@@ -216,7 +210,6 @@ public class DocumentService {
         }
     }
 
-    // Helper to convert hex string to byte array
     private byte[] hexToBytes(String s) {
         int len = s.length();
         byte[] data = new byte[len / 2];
@@ -227,7 +220,6 @@ public class DocumentService {
         return data;
     }
 
-    // Helper to convert byte array to hex string (Added for the IV Fix)
     private String bytesToHex(byte[] bytes) {
         StringBuilder sb = new StringBuilder();
         for (byte b : bytes) {

@@ -59,8 +59,6 @@ public class WebSecurityConfig {
                                 ).permitAll()
                                 .anyRequest().authenticated()
                 );
-
-        // --- FIX 3: Use the injected variable ---
         http.addFilterBefore(
                 authenticationJwtTokenFilter,
                 UsernamePasswordAuthenticationFilter.class

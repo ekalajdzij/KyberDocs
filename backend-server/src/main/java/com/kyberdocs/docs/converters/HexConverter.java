@@ -18,7 +18,6 @@ public class HexConverter implements AttributeConverter<byte[], String> {
         return hexToBytes(dbData);
     }
 
-    // Static helpers so Services can use them for Python responses too
     public static String bytesToHex(byte[] bytes) {
         StringBuilder sb = new StringBuilder();
         for (byte b : bytes) {

@@ -74,38 +74,36 @@ public class BeneficiaryService {
         DocumentKeys ownerKeys = documentKeysRepository.findByDocument(doc)
                 .orElseThrow(() -> new RuntimeException("Keys not found"));
 
-        // Unwrap Owner's Private Key
+        // Unwrap owner's Private Key
         byte[] ownerPrivateKey = securityUtil.decrypt(owner.getKyberSecretKey());
         byte[] masterFileKey = null;
 
         try {
-            // Decapsulate to get the original File Master Key (in bytes)
+            // Decapsulate to get the original file Master Key
             masterFileKey = decapsulateKey(ownerKeys.getKyberCapsule(), ownerPrivateKey);
 
-            //  Encapsulate for Target User (creates a new Wrapper Shared Secret)
+            //  Call Encapsulate function for desired Beneficiary to get the Wrapper Key
             String targetPkHex = HexConverter.bytesToHex(targetUser.getKyberPublicKey());
             KyberEncapsulateResponse wrapper = encapsulateForKey(targetPkHex);
 
-            // This is the key we use to wrap the master key
+            // Wrapper Key
             byte[] wrapperSharedSecret = HexConverter.hexToBytes(wrapper.getSharedSecretHashHex());
 
-            // Encrypt (Wrap) the Master Key using Target's Shared Secret
+            // Encrypt the Master Key using Wrapper Key
             byte[] encryptedMasterKeyBytes = securityUtil.encryptFile(masterFileKey, wrapperSharedSecret);
 
-            // Save everything
             Beneficiary beneficiary = new Beneficiary();
             beneficiary.setOwner(owner);
             beneficiary.setLinkedUser(targetUser);
             beneficiary.setDocument(doc);
 
-            // Store as bytes (HexConverter handles DB)
             beneficiary.setKyberCapsule(HexConverter.hexToBytes(wrapper.getCiphertextHex()));
             beneficiary.setEncryptedKey(encryptedMasterKeyBytes);
 
             return new BeneficiaryDto(beneficiaryRepository.save(beneficiary));
 
         } finally {
-            //(ZEROING)
+            // Zeroing
             if (ownerPrivateKey != null) Arrays.fill(ownerPrivateKey, (byte) 0);
             if (masterFileKey != null) Arrays.fill(masterFileKey, (byte) 0);
         }
@@ -128,8 +126,6 @@ public class BeneficiaryService {
     private byte[] decapsulateKey(byte[] capsule, byte[] privateKey) {
         String requestUrl = pythonServerUrl + "api/kyber/decapsulate";
         Map<String, String> requestBody = new HashMap<>();
-
-        // Convert bytes to Hex for Python API
         requestBody.put("ciphertextHex", HexConverter.bytesToHex(capsule));
         requestBody.put("secretKeyHex", HexConverter.bytesToHex(privateKey));
         requestBody.put("parameterSet", "kyber512");
@@ -137,7 +133,6 @@ public class BeneficiaryService {
         KyberDecapsulateResponse response = restTemplate.postForObject(requestUrl, requestBody, KyberDecapsulateResponse.class);
         if (response == null) throw new RuntimeException("Decapsulation failed");
 
-        // Return bytes
         return HexConverter.hexToBytes(response.getSharedSecretHashHex());
     }
 
