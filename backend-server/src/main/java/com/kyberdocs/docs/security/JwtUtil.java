@@ -3,8 +3,13 @@ package com.kyberdocs.docs.security;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
+import org.springframework.web.util.WebUtils;
+
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
@@ -20,6 +25,9 @@ public class JwtUtil {
 
     @Value("${jwt.expiration}")
     private int jwtExpirationMs;
+
+    // The name of the cookie that will hold the JWT
+    private final String jwtCookieName = "kyber_jwt";
 
     private SecretKey key;
 
@@ -100,5 +108,43 @@ public class JwtUtil {
         }
         return false;
     }
-}
 
+    // =========================================================================
+    // NEW COOKIE HANDLING METHODS
+    // =========================================================================
+
+    /*
+        Extract the JWT from the HTTP request cookies
+    */
+    public String getJwtFromCookies(HttpServletRequest request) {
+        Cookie cookie = WebUtils.getCookie(request, jwtCookieName);
+        if (cookie != null) {
+            return cookie.getValue();
+        }
+        return null;
+    }
+
+    /*
+        Generate an HttpOnly cookie containing the JWT
+    */
+    public ResponseCookie generateJwtCookie(String jwt) {
+        return ResponseCookie.from(jwtCookieName, jwt)
+                .path("/api")
+                .maxAge(jwtExpirationMs / 1000)
+                .httpOnly(true)                             // Prevent XSS attacks
+                .secure(true)
+                .sameSite("Strict")                         // Prevents CSRF attacks
+                .build();
+    }
+
+    /*
+        Generate an empty, expired cookie to clear it on logout
+    */
+    public ResponseCookie getCleanJwtCookie() {
+        return ResponseCookie.from(jwtCookieName, "")
+                .path("/api")
+                .maxAge(0)                                  // Setting maxAge to 0 deletes the cookie
+                .httpOnly(true)
+                .build();
+    }
+}

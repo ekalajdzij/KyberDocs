@@ -4,6 +4,7 @@ import com.kyberdocs.docs.auth.AuthService;
 import com.kyberdocs.docs.converters.HexConverter; // Import konvertera
 import com.kyberdocs.docs.users.dto.SignUpRequestDto;
 import com.kyberdocs.docs.users.dto.UserResponseDto;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
+@SecurityRequirement(name = "cookieAuth")
 @RequestMapping("/api/admin/users")
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminController {

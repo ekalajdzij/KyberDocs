@@ -4,12 +4,14 @@ import com.kyberdocs.docs.converters.HexConverter; // Dodaj import za konverter
 import com.kyberdocs.docs.exceptions.UserNotFoundException;
 import com.kyberdocs.docs.users.dto.SignUpRequestDto;
 import com.kyberdocs.docs.users.dto.UserResponseDto;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
+@SecurityRequirement(name = "cookieAuth")
 @RequestMapping("/api/users")
 public class UserController {
 

@@ -4,6 +4,7 @@ import com.kyberdocs.docs.beneficiaries.dto.AddBeneficiaryRequestDto;
 import com.kyberdocs.docs.beneficiaries.dto.BeneficiaryDto;
 import com.kyberdocs.docs.users.User;
 import com.kyberdocs.docs.users.UserService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
+@SecurityRequirement(name = "cookieAuth")
 @RequestMapping("/api/beneficiaries")
 public class BeneficiaryController {
 

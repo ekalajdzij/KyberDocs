@@ -177,12 +177,14 @@ public class AuthService {
         return Map.of("accessToken", newAccessToken, "refreshToken", requestRefreshToken);
     }
 
+    // --- UPDATED LOGOUT METHOD ---
     @Transactional
-    public void logout(String authHeader) {
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+    public void logout(String jwt) {
+        // We removed the 'Bearer' substring logic since we are passing the raw JWT from the cookie
+        if (jwt == null || jwt.isEmpty()) {
             return;
         }
-        String jwt = authHeader.substring(7);
+
         String username = jwtUtil.getUsernameFromToken(jwt);
         User user = userRepository.findByUsername(username).orElse(null);
 

@@ -3,6 +3,7 @@ package com.kyberdocs.docs.documents;
 import com.kyberdocs.docs.documents.dto.DocumentSummaryDto;
 import com.kyberdocs.docs.users.User;
 import com.kyberdocs.docs.users.UserService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
+@SecurityRequirement(name = "cookieAuth")
 @RequestMapping("/api/documents")
 public class DocumentController {
 
