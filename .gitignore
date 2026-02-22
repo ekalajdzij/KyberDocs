@@ -31,6 +31,12 @@ build/
 !**/src/test/**/build/
 
 backend-server/src/main/resources/application-secrets.properties
+backend-server/src/main/resources/keystore.p12
+
+# SSL keystore
+keystore.p12
+*.p12
+*.jks
 
 ### VS Code ###
 .vscode/
