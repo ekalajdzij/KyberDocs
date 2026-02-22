@@ -2,6 +2,7 @@ package com.kyberdocs.docs.auth;
 
 import com.kyberdocs.docs.audit.AuditService;
 import com.kyberdocs.docs.converters.HexConverter;
+import com.kyberdocs.docs.exceptions.AccountLockedException;
 import com.kyberdocs.docs.exceptions.InvalidCredentialsException;
 import com.kyberdocs.docs.exceptions.UserAlreadyExistsException;
 import com.kyberdocs.docs.kyber.dto.KyberKeygenResponse;
@@ -11,6 +12,7 @@ import com.kyberdocs.docs.security.SecurityUtil;
 import com.kyberdocs.docs.users.*;
 import com.kyberdocs.docs.users.dto.SignInRequestDto;
 import com.kyberdocs.docs.users.dto.SignUpRequestDto;
+import jakarta.servlet.http.HttpServletRequest; // NOTE: Change to javax if using Spring Boot 2.x
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,7 @@ public class AuthService {
     private final AuditService auditService;
     private final RefreshTokenRepository refreshTokenRepository;
     private final RedisService redisService;
+    private final HttpServletRequest httpRequest;
 
     @Value("${python.server.url}")
     private String pythonServerUrl;
@@ -50,7 +53,8 @@ public class AuthService {
             SecurityUtil securityUtil,
             AuditService auditService,
             RefreshTokenRepository refreshTokenRepository,
-            RedisService redisService
+            RedisService redisService,
+            HttpServletRequest httpRequest
     ) {
         this.userService = userService;
         this.userRepository = userRepository;
@@ -61,6 +65,7 @@ public class AuthService {
         this.auditService = auditService;
         this.refreshTokenRepository = refreshTokenRepository;
         this.redisService = redisService;
+        this.httpRequest = httpRequest;
     }
 
     @Transactional
@@ -115,12 +120,43 @@ public class AuthService {
 
     @Transactional
     public Map<String, String> signIn(SignInRequestDto request) {
-        User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new InvalidCredentialsException("Invalid username or password"));
+        String ipAddress = getClientIP(httpRequest);
+        String normalizedUsername = request.getUsername().trim().toLowerCase();
 
+        // Create unique Redis prefixes
+        String ipIdentifier = "ip:" + ipAddress;
+        String userIdentifier = "user:" + normalizedUsername;
+
+        // 1. Check IP Lock first (The broadest shield against bots)
+        if (redisService.isLocked(ipIdentifier)) {
+            throw new AccountLockedException("Too many failed attempts from this IP address. Try again in 15 minutes.");
+        }
+
+        // 2. Check Username Lock
+        if (redisService.isLocked(userIdentifier)) {
+            throw new AccountLockedException("Account is locked due to too many failed attempts. Try again in 15 minutes.");
+        }
+
+        // 3. Query the database
+        User user = userRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> {
+                    // Record strike against BOTH the IP and the Username
+                    redisService.recordFailedAttempt(ipIdentifier);
+                    redisService.recordFailedAttempt(userIdentifier);
+                    return new InvalidCredentialsException("Invalid username or password");
+                });
+
+        // 4. Check password
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            // Record strike against BOTH the IP and the Username
+            redisService.recordFailedAttempt(ipIdentifier);
+            redisService.recordFailedAttempt(userIdentifier);
             throw new InvalidCredentialsException("Invalid username or password");
         }
+
+        // 5. Login successful! Clear BOTH attempt counters so they start fresh
+        redisService.clearAttempts(ipIdentifier);
+        redisService.clearAttempts(userIdentifier);
 
         String accessToken = jwtUtil.generateToken(user.getUsername(), user.getRole().name());
         RefreshToken refreshToken = createRefreshToken(user);
@@ -153,7 +189,6 @@ public class AuthService {
         user.setLastHeartbeat(new Timestamp(System.currentTimeMillis()));
         user.setInactivityTimeout(30 * 24 * 60 * 60);
 
-        // Admins don't strictly need Kyber keys
         user.setKyberPublicKey(null);
         user.setKyberSecretKey(null);
 
@@ -177,10 +212,8 @@ public class AuthService {
         return Map.of("accessToken", newAccessToken, "refreshToken", requestRefreshToken);
     }
 
-    // --- UPDATED LOGOUT METHOD ---
     @Transactional
     public void logout(String jwt) {
-        // We removed the 'Bearer' substring logic since we are passing the raw JWT from the cookie
         if (jwt == null || jwt.isEmpty()) {
             return;
         }
@@ -211,5 +244,18 @@ public class AuthService {
         refreshToken.setToken(UUID.randomUUID().toString());
 
         return refreshTokenRepository.save(refreshToken);
+    }
+
+    /**
+     * Helper method to safely extract the user's IP Address,
+     * even if they are behind a proxy, load balancer, or Cloudflare.
+     */
+    private String getClientIP(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty() && !"unknown".equalsIgnoreCase(xForwardedFor)) {
+            // X-Forwarded-For can contain multiple IPs, the first one is the original client
+            return xForwardedFor.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }
